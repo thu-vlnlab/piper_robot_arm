@@ -33,7 +33,7 @@ Reconnect the Intel RealSense depth camera and run: `realsense-viewer` to verify
 Verify that the kernel is updated :    
 `modinfo uvcvideo | grep "version:"` should include `realsense` string
 
-## Upgrading the Packages:
+### Upgrading the Packages:
 Refresh the local packages cache by invoking:  
   `sudo apt-get update`  
 
@@ -45,7 +45,7 @@ To upgrade selected packages only a more granular approach can be applied:
   E.g:   
   `sudo apt-get --only-upgrade install  librealsense2-utils librealsense2-dkms`  
 
-## Uninstalling the Packages:
+### Uninstalling the Packages:
 **Important** Removing Debian package is allowed only when no other installed packages directly refer to it. For example removing `librealsense2-udev-rules` requires `librealsense2` to be removed first.
 
 Remove a single package with:   
@@ -57,7 +57,7 @@ Remove all RealSense™ SDK-related packages with:
 
 
 
-# 安装相机ros2的节点依赖Installation on Ubuntu
+## 安装相机ros2的节点依赖Installation on Ubuntu
   
 <details>
   <summary>
@@ -104,7 +104,7 @@ Remove all RealSense™ SDK-related packages with:
   </details>
 
 
-# 启动相机节点Start the camera node
+## 启动相机节点Start the camera node
   
   #### with ros2 run:
     ros2 run realsense2_camera realsense2_camera_node
