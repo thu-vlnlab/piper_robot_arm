@@ -1,56 +1,59 @@
 # piper_robot_arm
 用于采集机械臂相关的摄像头以及机械臂的驱动，及采集代码
 
-# 安装相机驱动Installing the packages:
-1）Register the server's public key:
+## 安装相机驱动Installing the packages:
+- Register the server's public key:
+```
 sudo mkdir -p /etc/apt/keyrings
 curl -sSf https://librealsense.intel.com/Debian/librealsense.pgp | sudo tee /etc/apt/keyrings/librealsense.pgp > /dev/null
+```
 
-2）Make sure apt HTTPS support is installed: 
-sudo apt-get install apt-transport-https
+- Make sure apt HTTPS support is installed:
+`sudo apt-get install apt-transport-https`
 
-3）Add the server to the list of repositories:
-
+- Add the server to the list of repositories:
+```
 echo "deb [signed-by=/etc/apt/keyrings/librealsense.pgp] https://librealsense.intel.com/Debian/apt-repo `lsb_release -cs` main" | \
 sudo tee /etc/apt/sources.list.d/librealsense.list
 sudo apt-get update
+```
 
-4）Install the libraries (see section below if upgrading packages):
-sudo apt-get install librealsense2-dkms #可能会因为bios安全启动未关闭而失败
-sudo apt-get install librealsense2-utils
-The above two lines will deploy librealsense2 udev rules, build and activate kernel modules, runtime library and executable demos and tools.
+- Install the libraries (see section below if upgrading packages):  
+  `sudo apt-get install librealsense2-dkms`  
+  `sudo apt-get install librealsense2-utils`  
+  The above two lines will deploy librealsense2 udev rules, build and activate kernel modules, runtime library and executable demos and tools.  
 
-5）Optionally install the developer and debug packages:
-sudo apt-get install librealsense2-dev
-sudo apt-get install librealsense2-dbg
-With dev package installed, you can compile an application with librealsense using g++ -std=c++11 filename.cpp -lrealsense2 or an IDE of your choice.
+- Optionally install the developer and debug packages:  
+  `sudo apt-get install librealsense2-dev`  
+  `sudo apt-get install librealsense2-dbg`  
+  With `dev` package installed, you can compile an application with **librealsense** using `g++ -std=c++11 filename.cpp -lrealsense2` or an IDE of your choice.
 
-Reconnect the Intel RealSense depth camera and run: 
-realsense-viewer to verify the installation.
+Reconnect the Intel RealSense depth camera and run: `realsense-viewer` to verify the installation.
 
-Verify that the kernel is updated :
-modinfo uvcvideo | grep "version:" should include realsense string
+Verify that the kernel is updated :    
+`modinfo uvcvideo | grep "version:"` should include `realsense` string
 
-Upgrading the Packages:
-Refresh the local packages cache by invoking:
-sudo apt-get update
+## Upgrading the Packages:
+Refresh the local packages cache by invoking:  
+  `sudo apt-get update`  
 
-Upgrade all the installed packages, including librealsense with:
-sudo apt-get upgrade
+Upgrade all the installed packages, including `librealsense` with:  
+  `sudo apt-get upgrade`
 
-To upgrade selected packages only a more granular approach can be applied:
-sudo apt-get --only-upgrade install <package1 package2 ...>
-E.g:
-sudo apt-get --only-upgrade install  librealsense2-utils librealsense2-dkms
+To upgrade selected packages only a more granular approach can be applied:  
+  `sudo apt-get --only-upgrade install <package1 package2 ...>`  
+  E.g:   
+  `sudo apt-get --only-upgrade install  librealsense2-utils librealsense2-dkms`  
 
-Uninstalling the Packages:
-Important Removing Debian package is allowed only when no other installed packages directly refer to it. For example removing librealsense2-udev-rules requires librealsense2 to be removed first.
+## Uninstalling the Packages:
+**Important** Removing Debian package is allowed only when no other installed packages directly refer to it. For example removing `librealsense2-udev-rules` requires `librealsense2` to be removed first.
 
-Remove a single package with:
-sudo apt-get purge <package-name>
+Remove a single package with:   
+  `sudo apt-get purge <package-name>`  
 
-Remove all RealSense™ SDK-related packages with:
-dpkg -l | grep "realsense" | cut -d " " -f 3 | xargs sudo dpkg --purge
+Remove all RealSense™ SDK-related packages with:   
+  `dpkg -l | grep "realsense" | cut -d " " -f 3 | xargs sudo dpkg --purge`  
+
 
 
 
