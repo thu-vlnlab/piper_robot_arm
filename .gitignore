@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.venv/
+venv/
+.env
+.env.*
+.mypy_cache/
+.pytest_cache/
+.dmypy.json
+
+# Packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# IDE/Editor
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Coverage
+.coverage
+htmlcov/
+
+# Others
+.ipynb_checkpoints/
