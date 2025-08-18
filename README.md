@@ -102,10 +102,14 @@ dpkg -l | grep "realsense" | cut -d " " -f 3 | xargs sudo dpkg --purge
 
 <hr>
 # 启动相机节点Start the camera node
-- with ros2 run:
-```ros2 run realsense2_camera realsense2_camera_node```
-```ros2 run realsense2_camera realsense2_camera_node --ros-args -p enable_color:=false -p spatial_filter.enable:=true -p temporal_filter.enable:=true```
-- with ros2 launch:
-```ros2 launch realsense2_camera rs_launch.py```
-```ros2 launch realsense2_camera rs_launch.py depth_module.depth_profile:=1280x720x30 pointcloud.enable:=true```
-
+## Start the camera node
+  
+  #### with ros2 run:
+    ros2 run realsense2_camera realsense2_camera_node
+    # or, with parameters, for example - temporal and spatial filters are enabled:
+    ros2 run realsense2_camera realsense2_camera_node --ros-args -p enable_color:=false -p spatial_filter.enable:=true -p temporal_filter.enable:=true
+  
+  #### with ros2 launch:
+    ros2 launch realsense2_camera rs_launch.py
+    ros2 launch realsense2_camera rs_launch.py depth_module.depth_profile:=1280x720x30 pointcloud.enable:=true
+<hr>
