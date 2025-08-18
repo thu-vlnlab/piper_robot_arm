@@ -55,22 +55,52 @@ dpkg -l | grep "realsense" | cut -d " " -f 3 | xargs sudo dpkg --purge
 
 
 # 安装相机ros2的节点依赖Installation on Ubuntu
-Step 1: Install the ROS2 distribution
-Ubuntu 22.04:
-ROS2 Humble
+  
+<details>
+  <summary>
+    Step 1: Install the ROS2 distribution 
+  </summary>
 
-Step 2: Install latest Intel® RealSense™ SDK 2.0
-Install librealsense2 (without graphical tools and examples) debian package from ROS servers (Foxy EOL distro is not supported by this option):
-Configure your Ubuntu repositories
-Install all realsense ROS packages by sudo apt install ros-<ROS_DISTRO>-librealsense2*
-For example, for Humble distro: sudo apt install ros-humble-librealsense2*
+- #### Ubuntu 24.04:
+  - [ROS2 Kilted](https://docs.ros.org/en/kilted/Installation/Ubuntu-Install-Debs.html)
+  - [ROS2 Jazzy](https://docs.ros.org/en/jazzy/Installation/Ubuntu-Install-Debians.html)
 
-Step 3: Install ROS Wrapper for Intel® RealSense™ cameras
-Option 1: Install debian package from ROS servers (Foxy EOL distro is not supported by this option):
-Configure your Ubuntu repositories
-Install all realsense ROS packages by sudo apt install ros-<ROS_DISTRO>-realsense2-*
-For example, for Humble distro: sudo apt install ros-humble-realsense2-*
+- #### Ubuntu 22.04:
+  - [ROS2 Iron](https://docs.ros.org/en/iron/Installation/Ubuntu-Install-Debians.html)
+  - [ROS2 Humble](https://docs.ros.org/en/humble/Installation/Ubuntu-Install-Debians.html)
+  #### Ubuntu 20.04
+	- [ROS2 Foxy](https://docs.ros.org/en/foxy/Installation/Ubuntu-Install-Debians.html)
+</details>
+  
+<details>
+  <summary>
+    Step 2: Install latest Intel&reg; RealSense&trade; SDK 2.0
+  </summary>
 
+
+  
+- #### Option 2: Install librealsense2 (without graphical tools and examples) debian package from ROS servers (Foxy EOL distro is not supported by this option):
+  - [Configure](http://wiki.ros.org/Installation/Ubuntu/Sources) your Ubuntu repositories
+  - Install all realsense ROS packages by ```sudo apt install ros-<ROS_DISTRO>-librealsense2*```
+    - For example, for Humble distro: ```sudo apt install ros-humble-librealsense2*```
+
+</details>
+  
+<details>
+  <summary>
+    Step 3: Install ROS Wrapper for Intel&reg; RealSense&trade; cameras
+  </summary>
+  
+#### Option 1: Install debian package from ROS servers (Foxy EOL distro is not supported by this option):
+  - [Configure](http://wiki.ros.org/Installation/Ubuntu/Sources) your Ubuntu repositories
+  - Install all realsense ROS packages by ```sudo apt install ros-<ROS_DISTRO>-realsense2-*```
+  - For example, for Humble distro: ```sudo apt install ros-humble-realsense2-*```
+  
+
+  
+  </details>
+
+<hr>
 # 启动相机节点Start the camera node
 with ros2 run:
 ros2 run realsense2_camera realsense2_camera_node
