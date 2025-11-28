@@ -73,7 +73,7 @@ class Args:
     # Action execution frequency (Hz)
     data_freq: float = 15.0  # 数据频率，默认15Hz
     # Number of actions to execute per request
-    actions_per_request: int = 5  # 每次请求后执行多少个action
+    actions_per_request: int = 2  # 每次请求后执行多少个action
     # Output directory for plots
     output_dir: pathlib.Path = pathlib.Path(".")  # 输出目录
 
@@ -299,7 +299,7 @@ def _plot_request_actions(request_records: list, save_path: pathlib.Path, timest
     num_joints = request_records[0]['actions'].shape[1]
 
     # 创建图形
-    fig, axes = plt.subplots(num_joints, 1, figsize=(16, 2.5 * num_joints), sharex=True)
+    fig, axes = plt.subplots(num_joints, 1, figsize=(16, 4.5 * num_joints), sharex=True)
     if num_joints == 1:
         axes = [axes]
 
