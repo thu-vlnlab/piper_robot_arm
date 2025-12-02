@@ -55,12 +55,12 @@ class Args:
     host: str = "127.0.0.1"
     port: int | None = 6006
     api_key: str | None = None
-    num_steps: int = 300
+    num_steps: int = 200
     timing_file: pathlib.Path | None = None
     actions_file: pathlib.Path | None = pathlib.Path("actions_output.pkl")
     env: EnvMode = EnvMode.THU_VLNA
     publish_actions: bool = True
-    data_freq: float = 15.0
+    data_freq: float = 5.0
     actions_per_request: int = 2
     output_dir: pathlib.Path = pathlib.Path("./saved_data_image")
 

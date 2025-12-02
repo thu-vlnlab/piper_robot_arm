@@ -60,7 +60,7 @@ class Args:
     # API key to use for the server.
     api_key: str | None = None
     # Number of steps to run the policy for.
-    num_steps: int = 300
+    num_steps: int = 30
     # Path to save the timings to a parquet file. (e.g., timing.parquet)
     timing_file: pathlib.Path | None = None
     # Path to save the actions to a pickle file. (e.g., actions_output.pkl)
@@ -70,9 +70,9 @@ class Args:
     # Whether to publish actions to /joint_states topic
     publish_actions: bool = True  # 是否发布action到ROS话题（改为False默认关闭）
     # Action execution frequency (Hz)
-    data_freq: float = 15.0  # 数据频率，默认15Hz
+    data_freq: float = 5.0  # 数据频率，默认15Hz
     # Number of actions to execute per request
-    actions_per_request: int = 5  # 每次请求后执行多少个action
+    actions_per_request: int = 15  # 每次请求后执行多少个action
 
 
 class TimingRecorder:
