@@ -61,7 +61,7 @@ class Args:
     env: EnvMode = EnvMode.THU_VLNA
     publish_actions: bool = True
     data_freq: float = 15.0
-    actions_per_request: int = 5
+    actions_per_request: int = 2
     output_dir: pathlib.Path = pathlib.Path("./saved_data_image")
 
 
