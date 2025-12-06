@@ -593,6 +593,8 @@ def _observation_thu_vlna() -> dict:
         "observation/state": latest_joint_state,
         "observation/image": latest_image,
         "observation/wrist_image": latest_wrist_image,
+        # "prompt": "Move the robotic arm, and actuate the end-effector to press the elevator's DOWN call button.",
+
         "prompt": "Move the robotic arm, and actuate the end-effector to press the elevator's UP call button.",
     }
 
