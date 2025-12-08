@@ -11,7 +11,6 @@ import threading
 from datetime import datetime
 
 import numpy as np
-from scipy.interpolate import CubicSpline  # 用于三次样条插值
 import matplotlib
 matplotlib.use('Agg')  # 使用非GUI后端
 import matplotlib.pyplot as plt
@@ -61,7 +60,7 @@ class Args:
     actions_file: pathlib.Path | None = pathlib.Path("actions_output.pkl")
     env: EnvMode = EnvMode.THU_VLNA
     publish_actions: bool = True
-    data_freq: float = 15.0  # 插值后的目标频率
+    data_freq: float = 5.0
     actions_per_request: int = 2
     output_dir: pathlib.Path = pathlib.Path("./saved_data_image")
 
@@ -125,39 +124,6 @@ class TimingRecorder:
 
 def _get_timestamp() -> str:
     return datetime.now().strftime("%Y%m%d_%H%M%S")
-
-
-def _interpolate_actions(actions: np.ndarray, source_freq: float = 15.0, target_freq: float = 45.0) -> np.ndarray:
-    """
-    使用三次样条插值将action序列从source_freq插值到target_freq
-
-    Args:
-        actions: 原始action序列，shape=(N, num_joints)
-        source_freq: 原始序列的频率 (Hz)
-        target_freq: 目标频率 (Hz)
-
-    Returns:
-        插值后的action序列，shape=(M, num_joints)，其中 M = int(N * target_freq / source_freq)
-    """
-    num_actions, num_joints = actions.shape
-
-    # 计算原始和目标的时间轴
-    source_duration = (num_actions - 1) / source_freq  # 总时长（秒）
-    source_times = np.linspace(0, source_duration, num_actions)  # 原始时间点
-
-    # 计算目标时间点数量
-    num_target_actions = int(num_actions * target_freq / source_freq)
-    target_times = np.linspace(0, source_duration, num_target_actions)  # 目标时间点
-
-    # 对每个关节分别进行三次样条插值
-    interpolated_actions = np.zeros((num_target_actions, num_joints))
-    for joint_idx in range(num_joints):
-        cs = CubicSpline(source_times, actions[:, joint_idx])
-        interpolated_actions[:, joint_idx] = cs(target_times)
-
-    logger.info(f"🔄 [插值] {source_freq}Hz ({num_actions}步) -> {target_freq}Hz ({num_target_actions}步)")
-
-    return interpolated_actions
 
 
 def _plot_actions(actions: np.ndarray, save_path: pathlib.Path, timestamp: str) -> None:
@@ -337,31 +303,13 @@ def main(args: Args) -> None:
             for key, value in action_response.get("policy_timing", {}).items():
                 timing_recorder.record(f"policy_{key}", value)
             if 'actions' in action_response:
-                # === 原始代码（未插值）===
-                # with request_lock:
-                #     next_action_buffer = {
-                #         'actions': np.array(action_response['actions']),
-                #         'inference_time': inference_time,
-                #         'request_id': request_id
-                #     }
-                # logger.info(f"✅ [请求 {request_id}] 后台接收完成: shape={next_action_buffer['actions'].shape}, 耗时={inference_time_ms:.1f}ms")
-                # === 原始代码结束 ===
-
-                # === 新代码：添加插值 ===
-                raw_actions = np.array(action_response['actions'])
-                logger.info(f"✅ [请求 {request_id}] 后台接收原始序列: shape={raw_actions.shape} (15Hz), 耗时={inference_time_ms:.1f}ms")
-
-                # 使用三次样条插值从15Hz插值到45Hz
-                interpolated_actions = _interpolate_actions(raw_actions, source_freq=15.0, target_freq=45.0)
-
                 with request_lock:
                     next_action_buffer = {
-                        'actions': interpolated_actions,
+                        'actions': np.array(action_response['actions']),
                         'inference_time': inference_time,
                         'request_id': request_id
                     }
-                logger.info(f"✅ [请求 {request_id}] 插值后序列: shape={next_action_buffer['actions'].shape} (45Hz)")
-                # === 新代码结束 ===
+                logger.info(f"✅ [请求 {request_id}] 后台接收完成: shape={next_action_buffer['actions'].shape}, 耗时={inference_time_ms:.1f}ms")
             else:
                 logger.error(f"❌ [请求 {request_id}] 返回数据中没有'actions'字段")
         except Exception as e:
@@ -374,24 +322,7 @@ def main(args: Args) -> None:
     logger.info("🔄 [初始化] 同步请求首个action序列...")
     first_response = policy.infer(obs_fn())
     if 'actions' in first_response:
-        # === 原始代码（未插值）===
-        # action_buffer = np.array(first_response['actions'])
-        # action_index = 0
-        #
-        # # 【方案1】首次使用当前位置作为起点，计算初始偏移
-        # if latest_joint_state is not None:
-        #     current_offset = latest_joint_state - action_buffer[0]
-        #     logger.info(f"✅ [初始化] 初始偏移量: {current_offset}")
-        #
-        # logger.info(f"✅ [初始化] 收到首个序列: shape={action_buffer.shape}")
-        # === 原始代码结束 ===
-
-        # === 新代码：添加插值 ===
-        raw_actions = np.array(first_response['actions'])
-        logger.info(f"✅ [初始化] 收到原始序列: shape={raw_actions.shape} (15Hz)")
-
-        # 使用三次样条插值从15Hz插值到45Hz
-        action_buffer = _interpolate_actions(raw_actions, source_freq=15.0, target_freq=45.0)
+        action_buffer = np.array(first_response['actions'])
         action_index = 0
 
         # 【方案1】首次使用当前位置作为起点，计算初始偏移
@@ -399,8 +330,7 @@ def main(args: Args) -> None:
             current_offset = latest_joint_state - action_buffer[0]
             logger.info(f"✅ [初始化] 初始偏移量: {current_offset}")
 
-        logger.info(f"✅ [初始化] 插值后序列: shape={action_buffer.shape} (45Hz)")
-        # === 新代码结束 ===
+        logger.info(f"✅ [初始化] 收到首个序列: shape={action_buffer.shape}")
         current_request_record = {
             'request_id': 0,
             'actions': (action_buffer + current_offset).copy(),  # 记录补偿后的
