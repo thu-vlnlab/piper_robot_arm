@@ -56,12 +56,12 @@ class Args:
     host: str = "127.0.0.1"
     port: int | None = 6006
     api_key: str | None = None
-    num_steps: int = 200
+    num_steps: int = 800 #200
     timing_file: pathlib.Path | None = None
     actions_file: pathlib.Path | None = pathlib.Path("actions_output.pkl")
     env: EnvMode = EnvMode.THU_VLNA
     publish_actions: bool = True
-    data_freq: float = 15.0  # 插值后的目标频率
+    data_freq: float = 15.0  # 插值后的目标频率（插值到45Hz，所以执行频率也应该是45Hz）
     actions_per_request: int = 2
     output_dir: pathlib.Path = pathlib.Path("./saved_data_image")
 
@@ -436,7 +436,9 @@ def main(args: Args) -> None:
 
                     inference_time = new_buffer['inference_time']
                     inference_time_ms = inference_time * 1000
-                    actions_to_skip = int(inference_time / action_interval)
+                    # 插值后buffer是45Hz，所以应该按45Hz计算跳过数量
+                    interpolated_freq = 45.0  # 插值后的频率
+                    actions_to_skip = int(inference_time * interpolated_freq)
 
                     action_buffer = new_buffer['actions']
                     action_index = min(actions_to_skip, len(action_buffer) - 1) if actions_to_skip > 0 else 0
