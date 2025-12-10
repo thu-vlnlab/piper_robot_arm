@@ -8,6 +8,9 @@ import logging
 import pathlib
 import time
 import threading
+import signal
+import sys
+import select
 from datetime import datetime
 
 import numpy as np
@@ -27,6 +30,7 @@ from rclpy.node import Node
 from sensor_msgs.msg import JointState, Image
 from cv_bridge import CvBridge
 import cv2
+from rclpy.qos import qos_profile_sensor_data, QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPolicy
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +45,8 @@ latest_wrist_image_time = None
 cv_bridge = CvBridge()
 ros_spin_thread = None
 ros_spin_active = False
+stop_requested = False
+keyboard_listener = None
 
 
 class EnvMode(enum.Enum):
@@ -61,7 +67,7 @@ class Args:
     actions_file: pathlib.Path | None = pathlib.Path("actions_output.pkl")
     env: EnvMode = EnvMode.THU_VLNA
     publish_actions: bool = True
-    data_freq: float = 30.0  # 插值后的目标频率（插值到45Hz，所以执行频率也应该是45Hz）
+    data_freq: float = 15.0  # 插值后的目标频率（插值到45Hz，所以执行频率也应该是45Hz）
     actions_per_request: int = 10
     output_dir: pathlib.Path = pathlib.Path("./saved_data_image")
 
@@ -267,6 +273,53 @@ def _plot_request_actions(request_records: list, save_path: pathlib.Path, timest
     logger.info(f"✅ 图3 已保存: {plot_path}")
 
 
+def _publish_reset_position():
+    """发布复位位置到机械臂"""
+    if ros_node is None:
+        logger.warning("ROS节点未初始化，无法发布复位指令")
+        return
+    
+    reset_position = [0.0, 0.0, 0.0, 0.0, -0.3, 0.0, 0.0]
+    reset_velocity = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 10.0]
+    reset_effort = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.5]
+    
+    msg = JointState()
+    msg.header.stamp = ros_node.get_clock().now().to_msg()
+    msg.header.frame_id = 'piper_single'
+    msg.name = ['joint1', 'joint2', 'joint3', 'joint4', 'joint5', 'joint6', 'joint7']
+    msg.position = reset_position
+    msg.velocity = reset_velocity
+    msg.effort = reset_effort
+    
+    ros_node.joint_cmd_pub.publish(msg)
+    logger.info(f"🏠 已发送复位指令: position={reset_position}")
+
+
+def _keyboard_listener_thread():
+    """键盘监听线程（使用select非阻塞读取）"""
+    global stop_requested
+    logger.info("⌨️  键盘监听线程已启动，按 'q' + Enter 停止并复位")
+    while not stop_requested:
+        try:
+            # 使用select检查stdin是否有输入，超时0.1秒
+            if select.select([sys.stdin], [], [], 0.1)[0]:
+                line = sys.stdin.readline().strip()
+                if line.lower() == 'q':
+                    logger.warning("⚠️  检测到按键 'q'，准备停止并复位...")
+                    stop_requested = True
+                    break
+        except Exception as e:
+            # 如果stdin不可用（非交互式环境），静默退出
+            break
+
+
+def _signal_handler(sig, frame):
+    """Ctrl+C信号处理"""
+    global stop_requested
+    logger.warning("⚠️  检测到 Ctrl+C，准备停止并复位...")
+    stop_requested = True
+
+
 def main(args: Args) -> None:
     timestamp = _get_timestamp()
     logger.info(f"📅 运行时间戳: {timestamp}")
@@ -303,6 +356,15 @@ def main(args: Args) -> None:
 
     action_interval = 1.0 / args.data_freq
     logger.info(f"⚙️  执行参数: 频率={args.data_freq}Hz, 间隔={action_interval*1000:.1f}ms, 每{args.actions_per_request}个action后请求新序列")
+
+    # 注册Ctrl+C信号处理
+    signal.signal(signal.SIGINT, _signal_handler)
+
+    # 启动键盘监听线程
+    global keyboard_listener
+    keyboard_listener = threading.Thread(target=_keyboard_listener_thread, daemon=True)
+    keyboard_listener.start()
+    logger.info("⌨️  键盘监听已启动 (按 'q' + Enter 或 Ctrl+C 停止并复位)")
 
     action_buffer = None
     action_index = 0
@@ -415,6 +477,11 @@ def main(args: Args) -> None:
 
     with tqdm.tqdm(total=args.num_steps, desc="Executing actions [OFFSET]") as pbar:
         while total_executed < args.num_steps:
+            # 检查停止标志
+            if stop_requested:
+                logger.warning("⚠️  收到停止请求，准备退出...")
+                break
+            
             action_start = time.time()
 
             if actions_executed_since_request >= args.actions_per_request and not request_active:
@@ -500,7 +567,17 @@ def main(args: Args) -> None:
         current_request_record['executed_indices'] = current_executed_indices.copy()
         request_records.append(current_request_record)
 
-    logger.info(f"\n✅ 执行完成! 总共执行 {total_executed} 个action, 请求 {request_count} 次")
+    # 如果是手动停止，发送复位指令
+    if stop_requested:
+        logger.info("🏠 正在发送复位指令...")
+        _publish_reset_position()
+        time.sleep(2.0)  # 等待2秒让复位完成
+        logger.info("✅ 复位完成")
+    else:
+        logger.info(f"\n✅ 执行完成! 总共执行 {total_executed} 个action, 请求 {request_count} 次")
+
+    # 键盘监听线程是daemon线程，会自动退出
+
     timing_recorder.print_all_stats()
 
     if args.timing_file is not None:
@@ -582,9 +659,9 @@ def _init_ros_node():
     class ROSDataCollector(Node):
         def __init__(self):
             super().__init__('openpi_data_collector_offset')
-            self.joint_sub = self.create_subscription(JointState, '/joint_states_single', self.joint_callback, 10)
-            self.image_sub = self.create_subscription(Image, '/miivii_gmsl/image0', self.image_callback, 10)
-            self.wrist_image_sub = self.create_subscription(Image, '/camera/camera/color/image_raw', self.wrist_image_callback, 10)
+            self.joint_sub = self.create_subscription(JointState, '/joint_states_single', self.joint_callback, QoSProfile(depth=1, reliability=ReliabilityPolicy.BEST_EFFORT))
+            self.image_sub = self.create_subscription(Image, '/miivii_gmsl/image0', self.image_callback, QoSProfile(depth=1, reliability=ReliabilityPolicy.BEST_EFFORT))
+            self.wrist_image_sub = self.create_subscription(Image, '/camera/camera/color/image_raw', self.wrist_image_callback, QoSProfile(depth=1, reliability=ReliabilityPolicy.BEST_EFFORT))
             self.joint_cmd_pub = self.create_publisher(JointState, '/joint_states', 10)
             self.get_logger().info("ROS节点已初始化 [OFFSET]，等待数据...")
 
