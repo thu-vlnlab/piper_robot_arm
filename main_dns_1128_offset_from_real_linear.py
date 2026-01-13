@@ -1,6 +1,7 @@
 """
-方案1: 位置补偿 (Offset Compensation)
+方案1: 位置补偿 (Offset Compensation) - 线性插值版本
 每次收到新buffer时，用当前实际位置与模型轨迹起始位置的差做补偿，让动作连续
+使用线性插值从15Hz插值到45Hz
 """
 import dataclasses
 import enum
@@ -55,14 +56,16 @@ class Args:
     host: str = "127.0.0.1"
     port: int | None = 6006
     api_key: str | None = None
-    num_steps: int = 200
+    num_steps: int = 800
     timing_file: pathlib.Path | None = None
     actions_file: pathlib.Path | None = pathlib.Path("actions_output.pkl")
     env: EnvMode = EnvMode.THU_VLNA
     publish_actions: bool = True
-    data_freq: float = 5.0
-    actions_per_request: int = 2
+    data_freq: float = 15  # 插值后的执行频率（插值到45Hz，执行是15Hz）
+    actions_per_request: int = 6
     output_dir: pathlib.Path = pathlib.Path("./saved_data_image")
+    source_freq: float = 15.0  # 模型输出的原始频率
+    target_freq: float = 45.0  # 插值目标频率
 
 
 class TimingRecorder:
@@ -126,6 +129,39 @@ def _get_timestamp() -> str:
     return datetime.now().strftime("%Y%m%d_%H%M%S")
 
 
+def _interpolate_actions_linear(actions: np.ndarray, source_freq: float = 15.0, target_freq: float = 45.0) -> np.ndarray:
+    """
+    使用线性插值将action序列从source_freq插值到target_freq
+
+    Args:
+        actions: 原始action序列，shape=(N, num_joints)
+        source_freq: 原始序列的频率 (Hz)
+        target_freq: 目标频率 (Hz)
+
+    Returns:
+        插值后的action序列，shape=(M, num_joints)，其中 M = int(N * target_freq / source_freq)
+    """
+    num_actions, num_joints = actions.shape
+
+    # 计算原始和目标的时间轴
+    source_duration = (num_actions - 1) / source_freq  # 总时长（秒）
+    source_times = np.linspace(0, source_duration, num_actions)  # 原始时间点
+
+    # 计算目标时间点数量
+    num_target_actions = int(num_actions * target_freq / source_freq)
+    target_times = np.linspace(0, source_duration, num_target_actions)  # 目标时间点
+
+    # 对每个关节分别进行线性插值
+    interpolated_actions = np.zeros((num_target_actions, num_joints))
+    for joint_idx in range(num_joints):
+        # 使用numpy的线性插值
+        interpolated_actions[:, joint_idx] = np.interp(target_times, source_times, actions[:, joint_idx])
+
+    logger.info(f"🔄 [线性插值] {source_freq}Hz ({num_actions}步) -> {target_freq}Hz ({num_target_actions}步)")
+
+    return interpolated_actions
+
+
 def _plot_actions(actions: np.ndarray, save_path: pathlib.Path, timestamp: str) -> None:
     num_steps, num_joints = actions.shape
     fig, axes = plt.subplots(num_joints, 1, figsize=(14, 2.5 * num_joints), sharex=True)
@@ -145,9 +181,9 @@ def _plot_actions(actions: np.ndarray, save_path: pathlib.Path, timestamp: str) 
                 transform=ax.transAxes, verticalalignment='top',
                 bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5), fontsize=8)
     axes[-1].set_xlabel('Step', fontsize=11)
-    fig.suptitle(f'[OFFSET] Executed Action Trajectories (Total Steps: {num_steps})\n{timestamp}', fontsize=14, fontweight='bold')
+    fig.suptitle(f'[OFFSET-LINEAR] Executed Action Trajectories (Total Steps: {num_steps})\n{timestamp}', fontsize=14, fontweight='bold')
     plt.tight_layout()
-    plot_path = save_path / f"plot1_executed_actions_offset_{timestamp}.png"
+    plot_path = save_path / f"plot1_executed_actions_offset_linear_{timestamp}.png"
     plt.savefig(plot_path, dpi=150, bbox_inches='tight')
     plt.close(fig)
     logger.info(f"✅ 图1 已保存: {plot_path}")
@@ -172,9 +208,9 @@ def _plot_comparison(executed_actions: np.ndarray, actual_positions: np.ndarray,
                 transform=ax.transAxes, verticalalignment='top',
                 bbox=dict(boxstyle='round', facecolor='lightcyan', alpha=0.5), fontsize=8)
     axes[-1].set_xlabel('Step', fontsize=11)
-    fig.suptitle(f'[OFFSET] Command vs Actual Position Comparison (Total Steps: {num_steps})\n{timestamp}', fontsize=14, fontweight='bold')
+    fig.suptitle(f'[OFFSET-LINEAR] Command vs Actual Position Comparison (Total Steps: {num_steps})\n{timestamp}', fontsize=14, fontweight='bold')
     plt.tight_layout()
-    plot_path = save_path / f"plot2_comparison_offset_{timestamp}.png"
+    plot_path = save_path / f"plot2_comparison_offset_linear_{timestamp}.png"
     plt.savefig(plot_path, dpi=150, bbox_inches='tight')
     plt.close(fig)
     logger.info(f"✅ 图2 已保存: {plot_path}")
@@ -224,10 +260,10 @@ def _plot_request_actions(request_records: list, save_path: pathlib.Path, timest
             ax.legend(loc='upper right', fontsize=7, ncol=2)
     axes[-1].set_xlabel('Global Step (with overlap)', fontsize=11)
     fig.text(0.02, 0.01, 'Legend: ── Executed (solid)  --- Skipped (dashed+X)  ··· Discarded (dotted, faint)', fontsize=9, style='italic')
-    fig.suptitle(f'[OFFSET] Request Action Sequences (Total Requests: {len(request_records)})\n{timestamp}', fontsize=14, fontweight='bold')
+    fig.suptitle(f'[OFFSET-LINEAR] Request Action Sequences (Total Requests: {len(request_records)})\n{timestamp}', fontsize=14, fontweight='bold')
     plt.tight_layout()
     plt.subplots_adjust(bottom=0.05)
-    plot_path = save_path / f"plot3_request_actions_offset_{timestamp}.png"
+    plot_path = save_path / f"plot3_request_actions_offset_linear_{timestamp}.png"
     plt.savefig(plot_path, dpi=150, bbox_inches='tight')
     plt.close(fig)
     logger.info(f"✅ 图3 已保存: {plot_path}")
@@ -236,7 +272,8 @@ def _plot_request_actions(request_records: list, save_path: pathlib.Path, timest
 def main(args: Args) -> None:
     timestamp = _get_timestamp()
     logger.info(f"📅 运行时间戳: {timestamp}")
-    logger.info(f"🔧 方案: 位置补偿 (Offset Compensation)")
+    logger.info(f"🔧 方案: 位置补偿 (Offset Compensation) - 线性插值版本")
+    logger.info(f"🔧 插值设置: {args.source_freq}Hz -> {args.target_freq}Hz, 执行频率: {args.data_freq}Hz")
 
     # 确保输出目录存在
     args.output_dir.mkdir(parents=True, exist_ok=True)
@@ -303,13 +340,19 @@ def main(args: Args) -> None:
             for key, value in action_response.get("policy_timing", {}).items():
                 timing_recorder.record(f"policy_{key}", value)
             if 'actions' in action_response:
+                raw_actions = np.array(action_response['actions'])
+                logger.info(f"✅ [请求 {request_id}] 后台接收原始序列: shape={raw_actions.shape} ({args.source_freq}Hz), 耗时={inference_time_ms:.1f}ms")
+
+                # 使用线性插值
+                interpolated_actions = _interpolate_actions_linear(raw_actions, source_freq=args.source_freq, target_freq=args.target_freq)
+
                 with request_lock:
                     next_action_buffer = {
-                        'actions': np.array(action_response['actions']),
+                        'actions': interpolated_actions,
                         'inference_time': inference_time,
                         'request_id': request_id
                     }
-                logger.info(f"✅ [请求 {request_id}] 后台接收完成: shape={next_action_buffer['actions'].shape}, 耗时={inference_time_ms:.1f}ms")
+                logger.info(f"✅ [请求 {request_id}] 插值后序列: shape={next_action_buffer['actions'].shape} ({args.target_freq}Hz)")
             else:
                 logger.error(f"❌ [请求 {request_id}] 返回数据中没有'actions'字段")
         except Exception as e:
@@ -322,7 +365,11 @@ def main(args: Args) -> None:
     logger.info("🔄 [初始化] 同步请求首个action序列...")
     first_response = policy.infer(obs_fn())
     if 'actions' in first_response:
-        action_buffer = np.array(first_response['actions'])
+        raw_actions = np.array(first_response['actions'])
+        logger.info(f"✅ [初始化] 收到原始序列: shape={raw_actions.shape} ({args.source_freq}Hz)")
+
+        # 使用线性插值
+        action_buffer = _interpolate_actions_linear(raw_actions, source_freq=args.source_freq, target_freq=args.target_freq)
         action_index = 0
 
         # 【方案1】首次使用当前位置作为起点，计算初始偏移
@@ -330,7 +377,7 @@ def main(args: Args) -> None:
             current_offset = latest_joint_state - action_buffer[0]
             logger.info(f"✅ [初始化] 初始偏移量: {current_offset}")
 
-        logger.info(f"✅ [初始化] 收到首个序列: shape={action_buffer.shape}")
+        logger.info(f"✅ [初始化] 插值后序列: shape={action_buffer.shape} ({args.target_freq}Hz)")
         current_request_record = {
             'request_id': 0,
             'actions': (action_buffer + current_offset).copy(),  # 记录补偿后的
@@ -343,7 +390,7 @@ def main(args: Args) -> None:
         logger.error("❌ 初始化失败：无法获取首个action序列")
         return
 
-    with tqdm.tqdm(total=args.num_steps, desc="Executing actions [OFFSET]") as pbar:
+    with tqdm.tqdm(total=args.num_steps, desc="Executing actions [OFFSET-LINEAR]") as pbar:
         while total_executed < args.num_steps:
             action_start = time.time()
 
@@ -366,7 +413,9 @@ def main(args: Args) -> None:
 
                     inference_time = new_buffer['inference_time']
                     inference_time_ms = inference_time * 1000
-                    actions_to_skip = int(inference_time / action_interval)
+                    
+                    # 【修复】使用实际执行频率计算跳过数量
+                    actions_to_skip = int(inference_time / action_interval)  # 等价于 int(inference_time * args.data_freq)
 
                     action_buffer = new_buffer['actions']
                     action_index = min(actions_to_skip, len(action_buffer) - 1) if actions_to_skip > 0 else 0
@@ -438,17 +487,19 @@ def main(args: Args) -> None:
 
     if len(executed_actions_list) > 0:
         import pickle
-        pkl_path = args.output_dir / f"actions_output_offset_{timestamp}.pkl"
+        pkl_path = args.output_dir / f"actions_output_offset_linear_{timestamp}.pkl"
         save_data = {
             'executed_actions': executed_actions_list,
             'actual_positions': actual_positions_list,
             'request_records': request_records,
             'timestamp': timestamp,
-            'method': 'offset_compensation',
+            'method': 'offset_compensation_linear_interp',
             'args': {
                 'num_steps': args.num_steps,
                 'data_freq': args.data_freq,
                 'actions_per_request': args.actions_per_request,
+                'source_freq': args.source_freq,
+                'target_freq': args.target_freq,
             }
         }
         with open(pkl_path, 'wb') as f:
@@ -511,12 +562,12 @@ def _init_ros_node():
 
     class ROSDataCollector(Node):
         def __init__(self):
-            super().__init__('openpi_data_collector_offset')
+            super().__init__('openpi_data_collector_offset_linear')
             self.joint_sub = self.create_subscription(JointState, '/joint_states_single', self.joint_callback, 10)
             self.image_sub = self.create_subscription(Image, '/miivii_gmsl/image0', self.image_callback, 10)
             self.wrist_image_sub = self.create_subscription(Image, '/camera/camera/color/image_raw', self.wrist_image_callback, 10)
             self.joint_cmd_pub = self.create_publisher(JointState, '/joint_states', 10)
-            self.get_logger().info("ROS节点已初始化 [OFFSET]，等待数据...")
+            self.get_logger().info("ROS节点已初始化 [OFFSET-LINEAR]，等待数据...")
 
         def joint_callback(self, msg):
             global latest_joint_state, latest_joint_state_time
@@ -600,3 +651,4 @@ def _observation_thu_vlna() -> dict:
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     main(tyro.cli(Args))
+
