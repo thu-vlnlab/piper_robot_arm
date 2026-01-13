@@ -152,4 +152,4 @@ ssh到服务器之后，进入/root/autodl-tmp/solarixvla文件夹，python scri
 
 进入小车的/media/nvidia/nvme0n1/piper文件夹，
 ssh -p 46740 -L 6006:localhost:6006 root@connect.westd.seetacloud.com -N
-并输ssh的密码，然后python main_1124.py	即可
+并输ssh的密码，然后python main_dns_1128_offset_from_real_up.py	即可
